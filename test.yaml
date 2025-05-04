@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supplier-service-deployment
+  labels:
+    app: supplier-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supplier-service
+  template:
+    metadata:
+      labels:
+        app: supplier-service
+    spec:
+      containers:
+        - name: supplier-service
+          image: supplier-service # Change this after building
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MYSQL_HOST
+              value: mysql #  Use the service name of the MySQL service.
+            - name: MYSQL_USER
+              value: root
+            - name: MYSQL_PASSWORD
+              value: password #  Change this!  Use a Kubernetes secret.
+            - name: MYSQL_DB
+              value: suppliers_db
+          livenessProbe:  # Add these probes
+            httpGet:
+              path: /suppliers  #  Change this if you have a health check
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /suppliers
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10

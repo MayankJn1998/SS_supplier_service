@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+spec:
+  storageClassName: standard # Or your desired storage class
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi # Adjust as needed
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:5.7 # Or a specific version
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: password # Change this! Use a secret in production.
+            - name: MYSQL_DATABASE
+              value: suppliers_db
+          ports:
+            - containerPort: 3306
+          volumeMounts: # Persist data
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-data
+          persistentVolumeClaim:
+            claimName: mysql-pv-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  ports:
+    - port: 3306
+      name: mysql
+  selector:
+    app: mysql
+  type: ClusterIP # Important:  ClusterIP for internal access
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supplier-service-deployment
+  labels:
+    app: supplier-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supplier-service
+  template:
+    metadata:
+      labels:
+        app: supplier-service
+    spec:
+      containers:
+        - name: supplier-service
+          image: supplier-service:latest # Change this after building
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MYSQL_HOST
+              value: mysql #  Use the service name of the MySQL service.
+            - name: MYSQL_USER
+              value: root
+            - name: MYSQL_PASSWORD
+              value: password #  Change this!  Use a Kubernetes secret.
+            - name: MYSQL_DB
+              value: suppliers_db
+          livenessProbe:  # Add these probes
+            httpGet:
+              path: /suppliers  #  Change this if you have a health check
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /suppliers
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supplier-service-service
+spec:
+  selector:
+    app: supplier-service
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+  type: ClusterIP #  ClusterIP for internal
