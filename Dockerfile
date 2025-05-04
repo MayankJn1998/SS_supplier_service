@@ -10,6 +10,7 @@ WORKDIR /app
 
 RUN pip install Flask
 RUN pip install flask_mysqldb
+RUN pip install pika
 
 COPY . /app
 
